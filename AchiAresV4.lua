@@ -1,4 +1,4 @@
---// ACHI-ARES V4.2 (Loadstring Ready & RGB Ultimate)
+--// ACHI-ARES V4.3 (Fixed Slow Motion & RGB)
 local ScreenGui = Instance.new("ScreenGui")
 local MainFrame = Instance.new("Frame")
 local UICorner = Instance.new("UICorner")
@@ -28,7 +28,7 @@ local AimKey = Enum.KeyCode.Q
 local MenuKey = Enum.KeyCode.P
 
 --// GUI Setup
-ScreenGui.Name = "AchiAresV4_2"
+ScreenGui.Name = "AchiAresV4_3"
 ScreenGui.Parent = game:GetService("CoreGui")
 ScreenGui.ResetOnSpawn = false
 
@@ -55,13 +55,12 @@ RunService.RenderStepped:Connect(function()
 end)
 
 Title.Size = UDim2.new(1, 0, 0, 40)
-Title.Text = "ACHI ARES V4.2"
+Title.Text = "ACHI ARES V4.3"
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 18
 Title.BackgroundTransparency = 1
 Title.Parent = MainFrame
 
--- ปุ่มปิด (X)
 CloseBtn.Name = "CloseBtn"
 CloseBtn.Parent = MainFrame
 CloseBtn.BackgroundColor3 = Color3.fromRGB(220, 20, 60)
@@ -93,7 +92,7 @@ end
 
 StyleButton(FlingToggle, "Fling: OFF")
 StyleButton(AimToggle, "Aimbot: OFF")
-StyleButton(AntiGrabToggle, "Anti-Grab/Fling: OFF")
+StyleButton(AntiGrabToggle, "Anti-Grab: OFF")
 
 StrengthInput.Size = UDim2.new(0.9, 0, 0, 35)
 StrengthInput.PlaceholderText = "Force..."
@@ -103,7 +102,7 @@ StrengthInput.TextColor3 = Color3.new(1, 1, 1)
 StrengthInput.Parent = MainFrame
 Instance.new("UICorner", StrengthInput).CornerRadius = UDim.new(0, 8)
 
---// LOGIC
+--// Logic
 local function UpdateToggle(btn, state, text)
     btn.Text = text .. (state and ": ON" or ": OFF")
     btn.BackgroundColor3 = state and Color3.fromRGB(50, 50, 50) or Color3.fromRGB(30, 30, 30)
@@ -121,14 +120,44 @@ end)
 
 AntiGrabToggle.MouseButton1Click:Connect(function()
     AntiGrabEnabled = not AntiGrabEnabled
-    UpdateToggle(AntiGrabToggle, AntiGrabEnabled, "Anti-Grab/Fling")
+    UpdateToggle(AntiGrabToggle, AntiGrabEnabled, "Anti-Grab")
 end)
 
-StrengthInput.FocusLost:Connect(function()
-    StrengthMultiplier = tonumber(StrengthInput.Text) or 500
+--// 🚀 FIXED ANTI-GRAB (ตัวไม่ช้า เดินลื่น)
+RunService.Stepped:Connect(function()
+    if AntiGrabEnabled and LocalPlayer.Character then
+        local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            -- ล็อคแค่แรงหมุน (กันโดนเหวี่ยง)
+            hrp.RotVelocity = Vector3.new(0, 0, 0)
+            
+            -- ปล่อยให้ Velocity ทำงานเฉพาะตอนที่มึงเดิน (มวลตัวไม่เป็น 0)
+            -- ถ้าความเร็วสูงผิดปกติ (โดนโยน) จะดึงกลับมาให้ไม่เกิน 40
+            if hrp.Velocity.Magnitude > 45 then
+                hrp.Velocity = hrp.Velocity.Unit * 30
+            end
+        end
+
+        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                -- ทำลายการเชื่อมต่อ (Grabbing) ทันที
+                for _, obj in pairs(part:GetChildren()) do
+                    if obj:IsA("Weld") or obj:IsA("WeldConstraint") or obj.Name == "GrabPart" then
+                        obj:Destroy()
+                    end
+                end
+            end
+        end
+        
+        local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
+        if hum then
+            hum.PlatformStand = false
+            if hum.Sit then hum.Sit = false end
+        end
+    end
 end)
 
---// ตรรกะ Aimbot (Distance Magnitude)
+--// Aimbot Logic (Magnitude)
 local function getClosestPlayer()
     local closestPlayer = nil
     local shortestDistance = math.huge
@@ -156,28 +185,6 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
---// ANTI-GRAB/FLING (Force Release)
-RunService.Stepped:Connect(function()
-    if AntiGrabEnabled and LocalPlayer.Character then
-        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.Velocity = Vector3.new(0, 0, 0)
-                part.RotVelocity = Vector3.new(0, 0, 0)
-                for _, obj in pairs(part:GetChildren()) do
-                    if obj:IsA("Weld") or obj:IsA("WeldConstraint") or obj.Name == "GrabPart" then
-                        obj:Destroy()
-                    end
-                end
-            end
-        end
-        local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
-        if hum then
-            hum.PlatformStand = false
-            if hum.Sit then hum.Sit = false end
-        end
-    end
-end)
-
 --// FLING LOGIC
 workspace.ChildAdded:Connect(function(m)
     if FlingEnabled and m.Name == "GrabParts" then
@@ -190,7 +197,7 @@ workspace.ChildAdded:Connect(function(m)
                     if not m.Parent then
                         if UserInputService:GetLastInputType() == Enum.UserInputType.MouseButton2 then
                             bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                            bv.Velocity = Camera.CFrame.LookVector * StrengthMultiplier
+                            bv.Velocity = Camera.CFrame.LookVector * tonumber(StrengthInput.Text)
                             Debris:AddItem(bv, 1)
                         else
                             bv:Destroy()
@@ -205,5 +212,3 @@ end)
 UserInputService.InputBegan:Connect(function(i, gp)
     if not gp and i.KeyCode == MenuKey then MainFrame.Visible = not MainFrame.Visible end
 end)
-
-game:GetService("StarterGui"):SetCore("SendNotification", {Title = "Achi Ares V4.2", Text = "Loadstring Successful! Press P to Open Menu"})

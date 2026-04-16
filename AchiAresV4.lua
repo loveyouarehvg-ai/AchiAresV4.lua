@@ -92,7 +92,7 @@ end
 
 StyleButton(FlingToggle, "Fling: OFF")
 StyleButton(AimToggle, "Aimbot: OFF")
-StyleButton(AntiGrabToggle, "Anti-Grab: OFF")
+StyleButton(AntiGrabToggle, "Anti-Grab/Fling: OFF")
 
 StrengthInput.Size = UDim2.new(0.9, 0, 0, 35)
 StrengthInput.PlaceholderText = "Force..."
@@ -102,45 +102,18 @@ StrengthInput.TextColor3 = Color3.new(1, 1, 1)
 StrengthInput.Parent = MainFrame
 Instance.new("UICorner", StrengthInput).CornerRadius = UDim.new(0, 8)
 
---// Logic
-local function UpdateToggle(btn, state, text)
-    btn.Text = text .. (state and ": ON" or ": OFF")
-    btn.BackgroundColor3 = state and Color3.fromRGB(50, 50, 50) or Color3.fromRGB(30, 30, 30)
-end
-
-FlingToggle.MouseButton1Click:Connect(function()
-    FlingEnabled = not FlingEnabled
-    UpdateToggle(FlingToggle, FlingEnabled, "Fling")
-end)
-
-AimToggle.MouseButton1Click:Connect(function()
-    AimbotEnabled = not AimbotEnabled
-    UpdateToggle(AimToggle, AimbotEnabled, "Aimbot")
-end)
-
-AntiGrabToggle.MouseButton1Click:Connect(function()
-    AntiGrabEnabled = not AntiGrabEnabled
-    UpdateToggle(AntiGrabToggle, AntiGrabEnabled, "Anti-Grab")
-end)
-
---// 🚀 FIXED ANTI-GRAB (ตัวไม่ช้า เดินลื่น)
+--// 🚀 FIXED ANTI-GRAB (แก้ตัวช้า)
 RunService.Stepped:Connect(function()
     if AntiGrabEnabled and LocalPlayer.Character then
         local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         if hrp then
-            -- ล็อคแค่แรงหมุน (กันโดนเหวี่ยง)
             hrp.RotVelocity = Vector3.new(0, 0, 0)
-            
-            -- ปล่อยให้ Velocity ทำงานเฉพาะตอนที่มึงเดิน (มวลตัวไม่เป็น 0)
-            -- ถ้าความเร็วสูงผิดปกติ (โดนโยน) จะดึงกลับมาให้ไม่เกิน 40
             if hrp.Velocity.Magnitude > 45 then
                 hrp.Velocity = hrp.Velocity.Unit * 30
             end
         end
-
         for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
             if part:IsA("BasePart") then
-                -- ทำลายการเชื่อมต่อ (Grabbing) ทันที
                 for _, obj in pairs(part:GetChildren()) do
                     if obj:IsA("Weld") or obj:IsA("WeldConstraint") or obj.Name == "GrabPart" then
                         obj:Destroy()
@@ -148,7 +121,6 @@ RunService.Stepped:Connect(function()
                 end
             end
         end
-        
         local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
         if hum then
             hum.PlatformStand = false
@@ -162,7 +134,6 @@ local function getClosestPlayer()
     local closestPlayer = nil
     local shortestDistance = math.huge
     if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return nil end
-
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
             local distance = (player.Character.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
